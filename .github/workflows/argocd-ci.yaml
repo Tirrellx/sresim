@@ -29,3 +29,4 @@ jobs:
           docker push ghcr.io/${{ github.repository_owner }}/sresim:latest
 
       # Removed the separate "update infra repo" section
+
