@@ -1,11 +1,13 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"net/http"
 
 	"github.com/tirrellx/sresim/pkg/handlers"
 	"github.com/tirrellx/sresim/pkg/middleware"
+	"github.com/google/uuid"
 )
 
 func main() {
