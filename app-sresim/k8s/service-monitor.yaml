@@ -1,0 +1,23 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: sresim
+  labels:
+    release: prometheus
+spec:
+  selector:
+    matchLabels:
+      app: sresim
+  endpoints:
+  - port: http
+    path: /metrics
+    interval: 15s
+    scheme: http
+    tlsConfig:
+      insecureSkipVerify: true
+  - port: http
+    path: /health
+    interval: 30s
+    scheme: http
+    tlsConfig:
+      insecureSkipVerify: true 

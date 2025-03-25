@@ -19,14 +19,20 @@ RUN go mod download
 # Copy source code
 COPY . .
 
-# Build the application with additional security flags
+# Build the application with enhanced security flags
 RUN CGO_ENABLED=0 GOOS=linux \
     go build -a -installsuffix cgo \
     -ldflags="-w -s -extldflags '-static' \
     -X main.Version=$(git describe --tags --always --dirty) \
     -X main.BuildTime=$(date -u +'%Y-%m-%d_%H:%M:%S')" \
     -trimpath \
+    -gcflags="-l=4" \
     -o sresim ./cmd/main.go
+
+# Security scan stage
+FROM aquasec/trivy:latest AS security-scan
+COPY --from=builder /app/sresim /sresim
+RUN trivy filesystem --no-progress --ignore-unfixed --severity HIGH,CRITICAL /sresim
 
 # Run stage
 FROM gcr.io/distroless/static-debian12:nonroot
@@ -42,7 +48,13 @@ ENV GIN_MODE=release \
     TZ=UTC \
     GOMAXPROCS=1 \
     GODEBUG=netdns=go \
-    GOTRACEBACK=single
+    GOTRACEBACK=single \
+    GIN_DISABLE_COLOR=1 \
+    GIN_DISABLE_LOGGING=1 \
+    GIN_DISABLE_EXTENDED_LOGGING=1
+
+# Set read-only root filesystem
+VOLUME /tmp
 
 # Expose port
 EXPOSE 8080
@@ -52,4 +64,4 @@ HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
     CMD ["/sresim", "health"]
 
 # Run the application with security flags
-ENTRYPOINT ["/sresim"]
+ENTRYPOINT ["/sresim"] 

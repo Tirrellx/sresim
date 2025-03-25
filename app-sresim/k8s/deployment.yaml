@@ -1,0 +1,92 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sresim
+  labels:
+    app: sresim
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: sresim
+  template:
+    metadata:
+      labels:
+        app: sresim
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8080"
+        prometheus.io/path: "/metrics"
+    spec:
+      containers:
+      - name: sresim
+        image: sresim:latest
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            cpu: "100m"
+            memory: "128Mi"
+          limits:
+            cpu: "500m"
+            memory: "512Mi"
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: http
+          initialDelaySeconds: 5
+          periodSeconds: 10
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: http
+          initialDelaySeconds: 15
+          periodSeconds: 20
+        env:
+        - name: PROMETHEUS_MULTIPROC_DIR
+          value: "/tmp"
+        - name: OTEL_EXPORTER_OTLP_ENDPOINT
+          value: "http://otel-collector:4317"
+        - name: CONFIG_FILE
+          value: "/etc/sresim/config.yaml"
+        volumeMounts:
+        - name: tmp
+          mountPath: /tmp
+        - name: config
+          mountPath: /etc/sresim
+      volumes:
+      - name: tmp
+        emptyDir: {}
+      - name: config
+        configMap:
+          name: sresim-config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: sresim
+spec:
+  selector:
+    app: sresim
+  ports:
+  - protocol: TCP
+    port: 80
+    targetPort: 8081
+    name: http
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: sresim
+  labels:
+    release: prometheus
+spec:
+  selector:
+    matchLabels:
+      app: sresim
+  endpoints:
+  - port: http
+    path: /metrics
+    interval: 15s

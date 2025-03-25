@@ -1,28 +1,40 @@
 package main
 
 import (
-	"fmt"
 	"log"
 	"net/http"
 
 	"github.com/tirrellx/sresim/pkg/handlers"
+	"github.com/tirrellx/sresim/pkg/metrics"
 	"github.com/tirrellx/sresim/pkg/middleware"
-	"github.com/google/uuid"
+	"github.com/tirrellx/sresim/pkg/simulator"
 )
 
 func main() {
-	// Create a new HTTP multiplexer.
+	// Initialize metrics
+	if err := metrics.InitMetrics(); err != nil {
+		log.Fatalf("Failed to initialize metrics: %v", err)
+	}
+
+	// Create a new HTTP multiplexer
 	mux := http.NewServeMux()
 
-	// Define the /simulate endpoint that your handler will process.
+	// Define endpoints
 	mux.HandleFunc("/simulate", handlers.SimulateHandler)
+	mux.HandleFunc("/health", handlers.HealthCheckHandler)
+	mux.Handle("/metrics", metrics.MetricsHandler())
 
-	// Wrap the multiplexer with our chaos middleware.
-	chaosHandler := middleware.ChaosMiddleware(mux)
+	// Simulation endpoints
+	mux.HandleFunc("/scenarios", simulator.ListScenarios)
+	mux.HandleFunc("/scenarios/run", simulator.RunScenario)
+	mux.HandleFunc("/scenarios/stop", simulator.StopScenario)
 
-	// Start the HTTP server.
+	// Wrap the multiplexer with our middlewares
+	handler := middleware.ChaosMiddleware(metrics.MetricsMiddleware(mux))
+
+	// Start the HTTP server
 	log.Println("Starting server on :8081")
-	if err := http.ListenAndServe(":8081", chaosHandler); err != nil {
+	if err := http.ListenAndServe(":8081", handler); err != nil {
 		log.Fatalf("Server failed: %v", err)
 	}
 }

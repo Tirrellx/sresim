@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: sresim
+  labels:
+    app: sresim
+spec:
+  type: ClusterIP
+  ports:
+  - port: 8080
+    targetPort: http
+    name: http
+    protocol: TCP
+  selector:
+    app: sresim 
