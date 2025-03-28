@@ -4,7 +4,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/tirrellx/sresim/pkg/chaos"
+	"github.com/localstack/sresim/app-sresim/pkg/chaos"
 )
 
 // ChaosMiddleware intercepts HTTP requests and applies chaos

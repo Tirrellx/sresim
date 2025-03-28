@@ -1,10 +1,12 @@
 package metrics
 
 import (
+	"context"
 	"net/http"
 	"strconv"
 	"time"
 
+	"github.com/gin-gonic/gin"
 	prom "github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"go.opentelemetry.io/otel"
@@ -162,6 +164,29 @@ func init() {
 	prom.MustRegister(rateLimitCurrent)
 }
 
+// Init initializes all metrics
+func Init() error {
+	// Register all metrics
+	prom.MustRegister(requestDuration)
+	prom.MustRegister(requestTotal)
+	prom.MustRegister(errorTotal)
+	prom.MustRegister(activeScenarios)
+	prom.MustRegister(scenarioDuration)
+	prom.MustRegister(scenarioErrors)
+	prom.MustRegister(cpuUsage)
+	prom.MustRegister(memoryUsage)
+	prom.MustRegister(diskIO)
+	prom.MustRegister(networkLatency)
+	prom.MustRegister(networkErrors)
+	prom.MustRegister(circuitBreakerState)
+	prom.MustRegister(circuitBreakerFailures)
+	prom.MustRegister(rateLimitHits)
+	prom.MustRegister(rateLimitCurrent)
+
+	// Initialize OpenTelemetry metrics
+	return InitMetrics()
+}
+
 // InitMetrics initializes Prometheus and OpenTelemetry metrics
 func InitMetrics() error {
 	// Initialize Prometheus exporter
@@ -173,7 +198,6 @@ func InitMetrics() error {
 	// Create metric provider
 	provider := metric.NewMeterProvider(
 		metric.WithReader(exporter),
-		metric.WithInterval(time.Second*10),
 	)
 	otel.SetMeterProvider(provider)
 
@@ -293,4 +317,74 @@ func (sm *ScenarioMetrics) RecordRateLimitHit() {
 // UpdateRateLimit updates the current rate limit
 func (sm *ScenarioMetrics) UpdateRateLimit(limit float64) {
 	rateLimitCurrent.WithLabelValues(sm.scenarioType).Set(limit)
+}
+
+// HTTPMetricsMiddleware returns a Gin middleware for HTTP metrics
+func HTTPMetricsMiddleware() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		start := time.Now()
+		c.Next()
+		duration := time.Since(start).Seconds()
+		requestDuration.WithLabelValues(c.Request.URL.Path, c.Request.Method, strconv.Itoa(c.Writer.Status())).Observe(duration)
+		requestTotal.WithLabelValues(c.Request.URL.Path, c.Request.Method).Inc()
+		if c.Writer.Status() >= 400 {
+			errorTotal.WithLabelValues(c.Request.URL.Path, c.Request.Method).Inc()
+		}
+	}
+}
+
+// UpdateResourceMetrics updates CPU, memory, and disk I/O metrics
+func UpdateResourceMetrics(cpuBytes, memoryBytes, diskBytes int64) {
+	cpuUsage.WithLabelValues("").Set(float64(cpuBytes))
+	memoryUsage.WithLabelValues("").Set(float64(memoryBytes))
+	diskIO.WithLabelValues("", "read").Add(float64(diskBytes))
+}
+
+// UpdateCircuitBreakerState updates the circuit breaker state metric
+func UpdateCircuitBreakerState(state string) {
+	value := 0
+	switch state {
+	case "open":
+		value = 1
+	case "half-open":
+		value = 2
+	}
+	circuitBreakerState.WithLabelValues("").Set(float64(value))
+}
+
+// UpdateCircuitBreakerFailures increments the circuit breaker failures counter
+func UpdateCircuitBreakerFailures() {
+	circuitBreakerFailures.WithLabelValues("").Inc()
+}
+
+// UpdateRateLimitMetrics updates rate limit metrics
+func UpdateRateLimitMetrics(hits, current int64) {
+	rateLimitHits.WithLabelValues("").Add(float64(hits))
+	rateLimitCurrent.WithLabelValues("").Set(float64(current))
+}
+
+// MetricsContextKey is the key used to store metrics context in context.Context
+type MetricsContextKey struct{}
+
+var metricsContextKey = MetricsContextKey{}
+
+// MetricsContext holds metrics-related data
+type MetricsContext struct {
+	scenario *ScenarioMetrics
+}
+
+// WithMetricsContext adds metrics context to the given context
+func WithMetricsContext(ctx context.Context) context.Context {
+	return context.WithValue(ctx, metricsContextKey, &MetricsContext{})
+}
+
+// TrackScenario creates a new scenario metrics tracker
+func (mc *MetricsContext) TrackScenario(name string) *ScenarioMetrics {
+	mc.scenario = NewScenarioMetrics(name)
+	return mc.scenario
+}
+
+// TrackResources updates resource metrics
+func (mc *MetricsContext) TrackResources(cpuBytes, memoryBytes, diskBytes int64) {
+	UpdateResourceMetrics(cpuBytes, memoryBytes, diskBytes)
 }

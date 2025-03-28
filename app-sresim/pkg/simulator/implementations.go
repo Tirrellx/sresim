@@ -73,6 +73,10 @@ func (sm *ScenarioManager) StartResourceExhaustionSimulation(cpuPercentage, memo
 		// Allocate memory
 		memorySize := int(float64(memoryPercentage) / 100.0 * 1024 * 1024 * 1024) // GB
 		memory := make([]byte, memorySize)
+		// Use memory to prevent it from being garbage collected
+		for i := 0; i < len(memory); i += 4096 {
+			memory[i] = 1
+		}
 
 		// CPU intensive loop
 		for {

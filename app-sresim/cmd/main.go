@@ -4,10 +4,10 @@ import (
 	"log"
 	"net/http"
 
-	"github.com/tirrellx/sresim/pkg/handlers"
-	"github.com/tirrellx/sresim/pkg/metrics"
-	"github.com/tirrellx/sresim/pkg/middleware"
-	"github.com/tirrellx/sresim/pkg/simulator"
+	"github.com/localstack/sresim/app-sresim/pkg/handlers"
+	"github.com/localstack/sresim/app-sresim/pkg/metrics"
+	"github.com/localstack/sresim/app-sresim/pkg/middleware"
+	"github.com/localstack/sresim/app-sresim/pkg/simulator"
 )
 
 func main() {
